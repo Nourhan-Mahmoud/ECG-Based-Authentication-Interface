@@ -55,7 +55,8 @@ for uploaded_file in uploaded_files:
 if signal_name != "":
     signal, time, record = read_data("temp/"+signal_name)
     # st.write("Signal Shape:", signal.shape)
-    fig = wfdb.plot_wfdb(record=record, figsize=(200, 20), title='Record')
+    fig = wfdb.plot_wfdb(
+        record=record, figsize=(200, 20), title='Record')
     st.pyplot(fig)
     shutil.rmtree("temp")
     st.write("Done Reading files!")
@@ -69,10 +70,13 @@ st.write("Selected Feature Extraction Method: ",
          selected_feature_extraction_method)
 
 
-input_signal = None
+signal1, signal3, signal2, signal4 = None, None, None, None
 # region preprocessing
 if signal != "" and time != "":
-    input_signal = processing(signal)
+    signal1 = processing(signal)
+    signal2 = processing(signal)
+    signal3 = processing(signal)
+    signal4 = processing(signal)
 # endregion
 
 
@@ -90,10 +94,10 @@ if st.button("Predict"):
     col1, col2 = st.columns(2)
     with col1:
         if index == 0:
-            features, values = get_features(input_signal, index)
+            features, values = get_features(signal1, index)
             values = np.array(values).reshape(-1, 23)
             prediction = fid_model.predict_proba(values[:, :22])
-            threshold_percentage = 0.95
+            threshold_percentage = 0.8
             flag = 0
             for i in range(0, len(prediction)):
                 for subject_id, percentage in enumerate(prediction[i]):
@@ -108,7 +112,7 @@ if st.button("Predict"):
             if flag == 0:
                 st.write("subject is undefind")
         elif index == 1:
-            features, values = get_features(input_signal, index)
+            features, values = get_features(signal2, index)
             values = np.array(values).reshape(1, 81)
             prediction = non_fid_model.predict_proba(values[:, :80])
 
@@ -125,7 +129,7 @@ if st.button("Predict"):
                 st.write("subject is undefind")
 
         elif index == 2:
-            features, values = get_features(input_signal, index)
+            features, values = get_features(signal3, index)
             values = np.array(values).reshape(-1, 41)
             prediction = non_fid_bonus_model.predict_proba(values[:, :40])
             threshold_percentage = 0.95
@@ -144,9 +148,44 @@ if st.button("Predict"):
 
     with col2:
         if index == 0:
-            pass
+            samp_start = 500
+            samp_end = 2000
+            res = points_for_plot(signal4, start=samp_start, end=samp_end)
+            fs = 1000
+            time = len(res['denoised_signal'])/fs
+            ts = np.arange(0, time, 1.0 / fs)
+            fig, ax = plt.subplots()
+            ax.plot(ts, res['denoised_signal'],
+                    alpha=0.6, lw=1, label="Raw signal")
+            ax.scatter(res['qx']/fs, res['qy'], alpha=0.5,
+                       color='red', label="Q point")
+            ax.scatter(res['sx']/fs, res['sy'], alpha=0.5,
+                       color='green', label="S point")
+            ax.scatter(res['Rx']/fs, res['Ry'], alpha=0.5,
+                       color='blue', label="R point")
+            ax.scatter(res['qrs_on_x']/fs, res['qrs_on_y'],
+                       alpha=0.5, color='black', label="QRS onset")
+            ax.scatter(res['qrs_off_x']/fs, res['qrs_off_y'],
+                       alpha=0.5, color='yellow', label="QRS offset")
+            ax.scatter(res['Px']/fs, res['Py'], alpha=0.5,
+                       color='orange', label="P point")
+            ax.scatter(res['p_on_x']/fs, res['p_on_y'],
+                       alpha=0.5, color='pink', label="P onset")
+            ax.scatter(res['p_off_x']/fs, res['p_off_y'],
+                       alpha=0.5, color='cyan', label="P offset")
+            ax.scatter(res['Tx']/fs, res['Ty'], alpha=0.5,
+                       color='purple', label="T point")
+            ax.scatter(res['t_on_x']/fs, res['t_on_y'],
+                       alpha=0.5, color='brown', label="T onset")
+            ax.scatter(res['t_off_x']/fs, res['t_off_y'],
+                       alpha=0.5, color='gray', label="T offset")
+            ax.set_title("Fiducial Points")
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Amplitude (mV)")
+            ax.legend(prop={"size": 7}, loc="upper right")
+            st.pyplot(fig)
         elif index == 1:
-            cmp = non_fid_for_plot(input_signal)
+            cmp = non_fid_for_plot(signal2)
             fig, ax = plt.subplots(5)
             row = 0
             for i in range(0, 5):
@@ -158,12 +197,21 @@ if st.button("Predict"):
             fig.tight_layout(h_pad=0)
             st.pyplot(fig)
         elif index == 2:
-            '''
-            b, full_b = non_fiducial_features_bonus_plots(input_signal)
-            plt.plot(b)
-            plt.plot(full_b)
-            plt.legend(['b', 'full_b'], loc='upper left')
-            st.pyplot()
-            '''
-            pass
+            v1 = non_fiducial_features_bonus_plots(signal3)
+            v2 = non_fiducial_features_bonus_plots2(signal3)
+            fig, ax = plt.subplots(2)
+            row = 0
+            for i in range(0, 2):
+                if i == 0:
+                    ax[row].plot(v2[0])
+                    ax[row].set_title("")
+                    row += 1
+                else:
+                    ax[row].plot(v1[0])
+                    ax[row].set_title("")
+                    row += 1
+            for ax in fig.get_axes():
+                ax.label_outer()
+            fig.tight_layout(h_pad=0)
+            st.pyplot(fig)
 # endregion

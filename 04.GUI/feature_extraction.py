@@ -14,33 +14,7 @@ import statsmodels.api as sm
 
 
 # # Read Record
-
-
 fs = 1000
-# best start = 1300, best end = 3200
-patient_1 = wfdb.rdrecord('..//01.Dataset/104/s0306lre', channels=[1])
-patient_2 = wfdb.rdrecord('..//01.Dataset/117/s0291lre', channels=[1])
-patient_3 = wfdb.rdrecord('..//01.Dataset/122/s0312lre', channels=[1])
-patient_4 = wfdb.rdrecord('..//01.Dataset/166/s0275lre', channels=[1])
-patient_5 = wfdb.rdrecord('..//01.Dataset/173/s0305lre', channels=[1])
-patient_6 = wfdb.rdrecord('..//01.Dataset/182/s0308lre', channels=[1])
-patient_7 = wfdb.rdrecord('..//01.Dataset/234/s0460_re', channels=[1])
-patient_8 = wfdb.rdrecord('..//01.Dataset/238/s0466_re', channels=[1])
-patient_9 = wfdb.rdrecord('..//01.Dataset/255/s0491_re', channels=[1])
-patient_10 = wfdb.rdrecord('..//01.Dataset/252/s0487_re', channels=[1])
-
-signal_1 = patient_1.p_signal[:, 0]
-signal_2 = patient_2.p_signal[:, 0]
-signal_3 = patient_3.p_signal[:, 0]
-signal_4 = patient_4.p_signal[:, 0]
-signal_5 = patient_5.p_signal[:, 0]
-signal_6 = patient_6.p_signal[:, 0]
-signal_7 = patient_7.p_signal[:, 0]
-signal_8 = patient_8.p_signal[:, 0]
-signal_9 = patient_9.p_signal[:, 0]
-signal_10 = patient_10.p_signal[:, 0]
-
-time = len(signal_1) / fs
 
 
 def butter_bandpass_filter(input_signal, low_cutoff, high_cutoff, sampling_rate, order):
@@ -194,21 +168,21 @@ def process_signal(denoised_signal, y_lfiltered):
     return qx, qy, sx, sy
 
 
-def process_qrs(denoised_signal, y_lfiltered, window_smoothed_signal, qx, qy, sx, sy):
+def process_qrs(denoised_signal, y_lfiltered1, window_smoothed_signal, qx, qy, sx, sy):
     # Thresholding (Get R, any value not the peak between Q and S is set to 0)
-    print(len(denoised_signal), len(y_lfiltered), len(window_smoothed_signal))
+    #print(len(denoised_signal), len(y_lfiltered), len(window_smoothed_signal))
     for i in range(len(qx)):
-        y_lfiltered[qx[i]:sx[i]][y_lfiltered[qx[i]:sx[i]]
-                                 != max(y_lfiltered[qx[i]:sx[i]])] = 0
+        y_lfiltered1[qx[i]:sx[i]][y_lfiltered1[qx[i]:sx[i]]
+                                  != max(y_lfiltered1[qx[i]:sx[i]])] = 0
 
     # Remove any peaks that are not Rs
-    y_lfiltered[y_lfiltered < max(y_lfiltered)*0.65] = 0
+    y_lfiltered1[y_lfiltered1 < max(y_lfiltered1)*0.65] = 0
 
     # Retrieve R
     Rx = []
     Ry = []
-    for i in range(len(y_lfiltered)):
-        if y_lfiltered[i] != 0:
+    for i in range(len(y_lfiltered1)):
+        if y_lfiltered1[i] != 0:
             Rx.append(i)
             Ry.append(denoised_signal[i])
 
@@ -304,7 +278,7 @@ def extract_p_wave(fs, qrs_on_x, denoised_signal):
     Px = []
     Py = []
     for loc in qrs_on_x:
-        loc = qrs_on_x[0]  # QRS onset
+        loc = loc-10  # QRS onset
         start_idx = int(loc - window_size)
 
         px = 0
@@ -353,6 +327,7 @@ def calculate_t_wave(qrs_off_x, denoised_signal):
     for loc in qrs_off_x:
         tx = 0
         ty = 5
+        loc += 10
         start_idx = int(loc + window_size)
         for i in range(loc, start_idx):
             if(i+50 < len(denoised_signal)):
@@ -597,7 +572,7 @@ def non_fiducial_features_bonus_plots(signal):
     denoised_signal = get_de(signal)
 
     # Process ECG signal
-    out = ecg.ecg(signal=signal_8, sampling_rate=1000., show=False)
+    out = ecg.ecg(signal=denoised_signal, sampling_rate=1000., show=False)
 
     # Get QRS peaks
     Rx = out['rpeaks']
@@ -645,7 +620,38 @@ def non_fiducial_features_bonus_plots(signal):
             for i in range(40-len(non_fiducial_feature)):
                 non_fiducial_feature.append(0)
         list_of_non_fiducial_features_1.append(np.array(non_fiducial_feature))
-    return list_of_non_fiducial_features_1, nonFiducials_for_Full_signal_1
+    return list_of_non_fiducial_features_1
+
+
+def non_fiducial_features_bonus_plots2(signal):
+    denoised_signal = get_de(signal)
+
+    # Process ECG signal
+    out = ecg.ecg(signal=denoised_signal, sampling_rate=1000., show=False)
+
+    # Get QRS peaks
+    Rx = out['rpeaks']
+    nonFiducials_for_Full_signal_1 = []
+
+    for i in range(1, len(Rx)-1):
+        RR_previous = Rx[i]-Rx[i-1]
+        RR_next = Rx[i+1]-Rx[i]
+
+        nonFiducial = []
+
+        after_Rpeak = int(2/3*((RR_previous+RR_next)/2))
+
+        for x in range(int(Rx[i]), int(Rx[i])+after_Rpeak):
+            nonFiducial.append(denoised_signal[x])
+
+        Before_Rpeak = int(1/3*((RR_previous+RR_next)/2))
+
+        for j in range(Before_Rpeak+int(Rx[i-1]), int(Rx[i])):
+            nonFiducial.append(denoised_signal[j])
+
+        nonFiducials_for_Full_signal_1.append(nonFiducial)
+
+    return nonFiducials_for_Full_signal_1
 
 
 # apply AC and DCT
