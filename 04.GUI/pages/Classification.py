@@ -87,56 +87,83 @@ def get_features(signal, index):
 
 # region Classification
 if st.button("Predict"):
-    if index == 0:
-        features, values = get_features(input_signal, index)
-        values = np.array(values).reshape(-1, 23)
-        prediction = fid_model.predict_proba(values[:, :22])
-        threshold_percentage = 0.95
-        flag = 0
-        for i in range(0, len(prediction)):
-            for subject_id, percentage in enumerate(prediction[i]):
+    col1, col2 = st.columns(2)
+    with col1:
+        if index == 0:
+            features, values = get_features(input_signal, index)
+            values = np.array(values).reshape(-1, 23)
+            prediction = fid_model.predict_proba(values[:, :22])
+            threshold_percentage = 0.95
+            flag = 0
+            for i in range(0, len(prediction)):
+                for subject_id, percentage in enumerate(prediction[i]):
 
-                if percentage >= threshold_percentage:
-                    st.write(
-                        f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
-                    flag = 1
-            if flag == 1:
-                break
+                    if percentage >= threshold_percentage:
+                        st.write(
+                            f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
+                        flag = 1
+                if flag == 1:
+                    break
 
-        if flag == 0:
-            st.write("subject is undefind")
-    elif index == 1:
-        features, values = get_features(input_signal, index)
-        values = np.array(values).reshape(1, 81)
-        prediction = non_fid_model.predict_proba(values[:, :80])
+            if flag == 0:
+                st.write("subject is undefind")
+        elif index == 1:
+            features, values = get_features(input_signal, index)
+            values = np.array(values).reshape(1, 81)
+            prediction = non_fid_model.predict_proba(values[:, :80])
 
-        threshold_percentage = 0.5
-        flag = 0
-        for i in range(0, len(prediction)):
-            for subject_id, percentage in enumerate(prediction[i]):
+            threshold_percentage = 0.5
+            flag = 0
+            for i in range(0, len(prediction)):
+                for subject_id, percentage in enumerate(prediction[i]):
 
-                if percentage >= threshold_percentage:
-                    st.write(
-                        f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
-                    flag = 1
-        if flag == 0:
-            st.write("subject is undefind")
+                    if percentage >= threshold_percentage:
+                        st.write(
+                            f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
+                        flag = 1
+            if flag == 0:
+                st.write("subject is undefind")
 
-    elif index == 2:
-        features, values = get_features(input_signal, index)
-        values = np.array(values).reshape(-1, 41)
-        prediction = non_fid_bonus_model.predict_proba(values[:, :40])
-        threshold_percentage = 0.95
-        flag = 0
-        for i in range(0, len(prediction)):
-            for subject_id, percentage in enumerate(prediction[i]):
+        elif index == 2:
+            features, values = get_features(input_signal, index)
+            values = np.array(values).reshape(-1, 41)
+            prediction = non_fid_bonus_model.predict_proba(values[:, :40])
+            threshold_percentage = 0.95
+            flag = 0
+            for i in range(0, len(prediction)):
+                for subject_id, percentage in enumerate(prediction[i]):
 
-                if percentage >= threshold_percentage:
-                    st.write(
-                        f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
-                    flag = 1
-            if flag == 1:
-                break
-        if flag == 0:
-            st.write("subject is undefind")
+                    if percentage >= threshold_percentage:
+                        st.write(
+                            f"Identified as subject {subject_id+1} with {percentage*100}% certainty.")
+                        flag = 1
+                if flag == 1:
+                    break
+            if flag == 0:
+                st.write("subject is undefind")
+
+    with col2:
+        if index == 0:
+            pass
+        elif index == 1:
+            cmp = non_fid_for_plot(input_signal)
+            fig, ax = plt.subplots(5)
+            row = 0
+            for i in range(0, 5):
+                ax[row].plot(cmp[i])
+                ax[row].set_title("")
+                row += 1
+            for ax in fig.get_axes():
+                ax.label_outer()
+            fig.tight_layout(h_pad=0)
+            st.pyplot(fig)
+        elif index == 2:
+            '''
+            b, full_b = non_fiducial_features_bonus_plots(input_signal)
+            plt.plot(b)
+            plt.plot(full_b)
+            plt.legend(['b', 'full_b'], loc='upper left')
+            st.pyplot()
+            '''
+            pass
 # endregion

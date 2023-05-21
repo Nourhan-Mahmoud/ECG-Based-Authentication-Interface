@@ -1,4 +1,5 @@
 
+import biosppy.signals.ecg as ecg
 from scipy.signal import butter, filtfilt
 import wfdb
 from scipy import signal
@@ -510,12 +511,35 @@ def Fiducial_Points_Detection(signal):
 # region Bouns Feature Detection
 
 
+def points_for_plot(signal, start, end):
+    denoised_signal, y_lfiltered, window_smoothed_signal = signal
+    denoised_signal = denoised_signal[start:end]
+    y_lfiltered = y_lfiltered[start:end]
+    window_smoothed_signal = window_smoothed_signal[start:end]
+    time = len(signal)/fs
+    qx, qy, sx, sy = process_signal(denoised_signal, y_lfiltered)
+    qx, qy, sx, sy, Rx, Ry, qrs_on_x, qrs_on_y, qrs_off_x, qrs_off_y = process_qrs(denoised_signal, y_lfiltered, window_smoothed_signal,
+                                                                                   qx, qy, sx, sy)
+    Px, Py = extract_p_wave(fs, qrs_on_x, denoised_signal)
+    p_on_x, p_off_x, p_on_y, p_off_y = calculate_p_onset_offset(
+        Px, denoised_signal)
+    Tx, Ty = calculate_t_wave(qrs_off_x, denoised_signal)
+    t_on_x, t_off_x, t_on_y, t_off_y = calculate_t_onset_offset(
+        Tx, denoised_signal)
+    return {'denoised_signal': denoised_signal, 'y_lfiltered': y_lfiltered, 'window_smoothed_signal': window_smoothed_signal, 'time': time, 'qx': qx, 'qy': qy, 'sx': sx, 'sy': sy, 'Rx': Rx, 'Ry': Ry, 'qrs_on_x': qrs_on_x, 'qrs_on_y': qrs_on_y, 'qrs_off_x': qrs_off_x, 'qrs_off_y': qrs_off_y, 'Px': Px, 'Py': Py, 'p_on_x': p_on_x, 'p_off_x': p_off_x, 'p_on_y': p_on_y, 'p_off_y': p_off_y, 'Tx': Tx, 'Ty': Ty, 't_on_x': t_on_x, 't_off_x': t_off_x, 't_on_y': t_on_y, 't_off_y': t_off_y}
+
+
 def get_Rs(signal):
     denoised_signal, y_lfiltered, window_smoothed_signal = signal
     qx, qy, sx, sy = process_signal(denoised_signal, y_lfiltered)
     qx, qy, sx, sy, Rx, Ry, qrs_on_x, qrs_on_y, qrs_off_x, qrs_off_y = process_qrs(
         denoised_signal, y_lfiltered, window_smoothed_signal, qx, qy, sx, sy)
     return denoised_signal, Rx
+
+
+def get_de(signal):
+    denoised_signal, y_lfiltered, window_smoothed_signal = signal
+    return denoised_signal
 
 
 def non_fiducial_features_bonus(signal):
@@ -569,6 +593,61 @@ def non_fiducial_features_bonus(signal):
 # endregion
 
 
+def non_fiducial_features_bonus_plots(signal):
+    denoised_signal = get_de(signal)
+
+    # Process ECG signal
+    out = ecg.ecg(signal=signal_8, sampling_rate=1000., show=False)
+
+    # Get QRS peaks
+    Rx = out['rpeaks']
+    nonFiducials_for_Full_signal_1 = []
+
+    for i in range(1, len(Rx)-1):
+        RR_previous = Rx[i]-Rx[i-1]
+        RR_next = Rx[i+1]-Rx[i]
+
+        nonFiducial = []
+
+        after_Rpeak = int(2/3*((RR_previous+RR_next)/2))
+
+        for x in range(int(Rx[i]), int(Rx[i])+after_Rpeak):
+            nonFiducial.append(denoised_signal[x])
+
+        Before_Rpeak = int(1/3*((RR_previous+RR_next)/2))
+
+        for j in range(Before_Rpeak+int(Rx[i-1]), int(Rx[i])):
+            nonFiducial.append(denoised_signal[j])
+
+        nonFiducials_for_Full_signal_1.append(nonFiducial)
+
+    list_of_non_fiducial_features_1 = []
+    for i in range(len(nonFiducials_for_Full_signal_1)):
+        # Define the mother wavelet
+        wavelet = pywt.Wavelet('db4')
+
+        # Define the number of levels for decomposition
+        decomp_levels = 5
+
+        # Define the list of ECG signals
+        ecg_segments = np.array(
+            nonFiducials_for_Full_signal_1[i])  # Example data
+
+        # Decompose the signal
+        decomp = pywt.wavedec(ecg_segments, wavelet, level=decomp_levels)
+
+        CA5, CD5, CD4, CD3, CD2, CD1 = decomp
+
+        # only the coefficients of ECG band (1-40) use them as a feature
+        non_fiducial_feature = CA5[:40]
+        non_fiducial_feature = list(non_fiducial_feature)
+        if len(non_fiducial_feature) < 40:
+            for i in range(40-len(non_fiducial_feature)):
+                non_fiducial_feature.append(0)
+        list_of_non_fiducial_features_1.append(np.array(non_fiducial_feature))
+    return list_of_non_fiducial_features_1, nonFiducials_for_Full_signal_1
+
+
 # apply AC and DCT
 def nonFiducial(signal):
 
@@ -585,3 +664,20 @@ def nonFiducial(signal):
 
     components = [signal, Auto_corr, s1, DcT, dct]
     return components[4]
+
+
+def non_fid_for_plot(signal):
+
+    signal = signal[0]
+
+    Auto_corr = sm.tsa.acf(signal, nlags=len(signal))
+
+    s1 = Auto_corr[:1100]
+
+    DcT = scipy.fftpack.dct(s1, type=2)
+
+    # take only non zero signal
+    dct = DcT[:80]
+
+    components = [signal, Auto_corr, s1, DcT, dct]
+    return components
